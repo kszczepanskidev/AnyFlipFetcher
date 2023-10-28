@@ -30,44 +30,51 @@ anyflip_url = args.url
 if not (anyflip_url.startswith('http://') or anyflip_url.startswith('https://')):
     anyflip_url = 'https://' + anyflip_url
 
-# Setup web environment
-packages.urllib3.disable_warnings()
-binary = FirefoxBinary(firefoxPath)
-driver = webdriver.Firefox(firefox_binary=binary, executable_path=resource_path('.\driver\geckodriver.exe'))
+try:
+    # Setup web environment
+    packages.urllib3.disable_warnings()
+    binary = FirefoxBinary(firefoxPath)
+    driver = webdriver.Firefox(firefox_binary=binary, executable_path=resource_path('.\driver\geckodriver.exe'))
 
-# Setup image directory
-makedirs('pages/', exist_ok=True)
+    # Setup image directory
+    makedirs('pages/', exist_ok=True)
 
-# Get document page, page count and document title
-driver.get(anyflip_url)
-last_page = 5 #int(search(r'pages: "(\d+)",',  driver.page_source).groups(1))
-document_title = driver.find_element_by_css_selector('.show-info-middle-title').text
+    # Get document page, page count and document title
+    driver.get(anyflip_url)
+    last_page = int(search(r'pages: "(\d+)",',  driver.page_source).groups(1))
+    document_title = driver.find_element_by_css_selector('.show-info-middle-title').text
 
-# Setup focus on document frame
-driver.switch_to.frame('show-iFrame-book')
-sleep(5)
+    # Setup focus on document frame
+    driver.switch_to.frame('show-iFrame-book')
+    sleep(5)
 
-# Start fetching document pages
-def save_image(page, url):
-    with open(f'pages/page{page}.jpg', 'wb') as file:
-        file.write(get(url, verify=False).content)
+    # Start fetching document pages
+    def save_image(page, url):
+        with open(f'pages/page{page}.jpg', 'wb') as file:
+            file.write(get(url, verify=False).content)
 
-page = 1
-while page<last_page:
-    left_page = driver.find_element_by_css_selector(f'#page{page} img').get_attribute("src")
-    save_image(page, left_page)
+    page = 1
+    while page<last_page:
+        # Download left page image
+        left_page = driver.find_element_by_css_selector(f'#page{page} img').get_attribute("src")
+        save_image(page, left_page)
 
-    if page > 1:
-        right_page = driver.find_element_by_css_selector(f'#page{page+1} img').get_attribute("src")
-        save_image(page+1, right_page)
+        if page > 1:
+            # Download right page image
+            right_page = driver.find_element_by_css_selector(f'#page{page+1} img').get_attribute("src")
+            save_image(page+1, right_page)
 
-    driver.find_element_by_css_selector('#pageBar > div:nth-child(8)').click()
-    page += (2 if page > 1 else 1)
-    sleep(1)
+        # Proceed to next page
+        driver.find_element_by_xpath("//span[contains(text(), 'Next Page')]/ancestor::div[@class='button']").click()
+        page += (2 if page > 1 else 1)
+        sleep(1)
 
-# Convert all images to PDF file
-page_images = [Image.open(f"pages/page{p}.jpg") for p in range(1, last_page+1)]
-page_images[0].save(f'{document_title}.pdf', "PDF", resolution=100.0, save_all=True, append_images=page_images[1:])
+
+    # Convert all images to PDF file
+    page_images = [Image.open(f"pages/page{p}.jpg") for p in range(1, last_page+1)]
+    page_images[0].save(f'{document_title}.pdf', "PDF", resolution=100.0, save_all=True, append_images=page_images[1:])
+except:
+    pass
 
 # Close browser env
 driver.quit()
